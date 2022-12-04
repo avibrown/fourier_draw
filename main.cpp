@@ -51,7 +51,7 @@ void fourier_transform(Mat &img)
 
         // Perform inverse DFT
         Mat inverseTransform;
-        dft(dest, inverseTransform, DFT_INVERSE|DFT_REAL_OUTPUT);
+        idft(dest, inverseTransform, DFT_INVERSE|DFT_REAL_OUTPUT);
         normalize(inverseTransform, inverseTransform, 0, 1, NORM_MINMAX);
         imshow("Reconstructed", inverseTransform);
         waitKey(0);
