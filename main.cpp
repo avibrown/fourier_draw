@@ -36,9 +36,9 @@ void fourier_transform(Mat &img)
 
     dft(complexI, complexI, DFT_COMPLEX_OUTPUT);
 
-    for (int i=0; i<4000; i+=5) {
+    for (float i=0; i<4000; i+=2) {
         // Create disk mask matrix
-        Mat mask = Mat::zeros(complexI.size(), complexI.type());
+        Mat mask = Mat::zeros(complexI.size(), img.type());
         mask.convertTo(mask, CV_8U);
         circle(mask, Point(mask.cols/2, mask.rows/2), i, 1, -1, 8, 0);
 
