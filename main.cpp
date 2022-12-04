@@ -8,10 +8,7 @@ using namespace cv;
 
 void expand_img_to_optimal(Mat &padded, Mat &img);
 void fourier_transform(Mat &img);
-cv::Mat ifft_shift(const Mat& mat);
-cv::Mat fft_shift(const Mat& mat);
-bool FftShift(const Mat& src, Mat& dst);
-Mat ifft(Mat inputMatrix);                  
+void ifft_shift(Mat &mask);                
 
 int main(int argc, char **argv)
 {
@@ -45,15 +42,12 @@ void fourier_transform(Mat &img)
         mask.convertTo(mask, CV_8U);
         circle(mask, Point(mask.cols/2, mask.rows/2), i, 1, -1, 8, 0);
 
-        // Perform fft shift to mask
-        Mat mask_shifted;
-        //FftShift(mask, mask_shifted);
-        // mask_shifted = ifft_shift(mask);
-        mask_shifted = ifft(mask);
+        // Perform ifft shift
+        ifft_shift(mask);
 
-        // Destination matrix of masked spectrum
+        // Destination matrix for masked spectrum
         Mat dest;
-        complexI.copyTo(dest, mask_shifted);
+        complexI.copyTo(dest, mask);
 
         // Perform inverse DFT
         Mat inverseTransform;
@@ -70,138 +64,24 @@ void expand_img_to_optimal(Mat &padded, Mat &img) {
     copyMakeBorder(img, padded, 0, row - img.rows, 0, col - img.cols, BORDER_CONSTANT, Scalar::all(0));
 }
 
-cv::Mat ifft_shift(const cv::Mat& mat){
+void ifft_shift(Mat &mask) {
+    // input sizes
+    int sx = mask.cols;
+    int sy = mask.rows;
 
-    // create copy to not mess up the original matrix (ret is only a "window" over the provided matrix)
-    cv::Mat cpy;
-    mat.copyTo(cpy);
+    // input origin
+    int cx = sx / 2;
+    int cy = sy / 2;
 
-    // crop the spectrum, if it has an odd number of rows or columns
-    cv::Mat ret = cpy(cv::Rect(0, 0, cpy.cols & -2, cpy.rows & -2));
+    // split the quadrants
+    Mat top_left(mask, Rect(0, 0, cx, cy));
+    Mat top_right(mask, Rect(cx, 0, sx - cx, cy));
+    Mat bottom_left(mask, Rect(0, cy, cx, sy - cy));
+    Mat bottom_right(mask, Rect(cx, cy, sx - cx, sy - cy));
 
-    // rearrange the quadrants of Fourier image so that the origin is at the image center
-    int cx = ret.cols/2;
-    int cy = ret.rows/2;
-    cv::Mat q0(ret, cv::Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per quadrant
-    cv::Mat q1(ret, cv::Rect(cx, 0, cx, cy));  // Top-Right
-    cv::Mat q2(ret, cv::Rect(0, cy, cx, cy));  // Bottom-Left
-    cv::Mat q3(ret, cv::Rect(cx, cy, cx, cy)); // Bottom-Right
-
-    cv::Mat tmp; // swap quadrants (Bottom-Right with Top-Left)
-    q3.copyTo(tmp);
-    q0.copyTo(q3);
-    tmp.copyTo(q0);
-    q2.copyTo(tmp); // swap quadrant (Bottom-Left with Top-Right)
-    q1.copyTo(q2);
-    tmp.copyTo(q1);
-
-    return ret;
-}
-
-cv::Mat fft_shift(const cv::Mat& mat){
-    
-    // create copy to not mess up the original matrix (ret is only a "window" over the provided matrix)
-    cv::Mat cpy;
-    mat.copyTo(cpy);
-
-    // crop the spectrum, if it has an odd number of rows or columns
-    cv::Mat ret = cpy(cv::Rect(0, 0, cpy.cols & -2, cpy.rows & -2));
-
-    // rearrange the quadrants of Fourier image so that the origin is at the image center
-    int cx = ret.cols/2;
-    int cy = ret.rows/2;
-    cv::Mat q0(ret, cv::Rect(0, 0, cx, cy));   // Top-Left - Create a ROI per quadrant
-    cv::Mat q1(ret, cv::Rect(cx, 0, cx, cy));  // Top-Right
-    cv::Mat q2(ret, cv::Rect(0, cy, cx, cy));  // Bottom-Left
-    cv::Mat q3(ret, cv::Rect(cx, cy, cx, cy)); // Bottom-Right
-
-    cv::Mat tmp; // swap quadrants (Top-Left with Bottom-Right)
-    q0.copyTo(tmp);
-    q3.copyTo(q0);
-    tmp.copyTo(q3);
-    q1.copyTo(tmp); // swap quadrant (Top-Right with Bottom-Left)
-    q2.copyTo(q1);
-    tmp.copyTo(q2);
-
-    return ret;
-}
-
-bool FftShift(const Mat& src, Mat& dst)
-{
-  if(src.empty()) return true;
-
-  const uint h=src.rows, w=src.cols;        // height and width of src-image
-  const uint qh=h>>1, qw=w>>1;              // height and width of the quadrants
-
-  Mat qTL(src, Rect(   0,    0, qw, qh));   // define the quadrants in respect to
-  Mat qTR(src, Rect(w-qw,    0, qw, qh));   // the outer dimensions of the matrix.
-  Mat qBL(src, Rect(   0, h-qh, qw, qh));   // thus, with odd sizes, the center
-  Mat qBR(src, Rect(w-qw, h-qh, qw, qh));   // line(s) get(s) omitted.
-
-  Mat tmp;
-  hconcat(qBR, qBL, dst);                   // build destination matrix with switched
-  hconcat(qTR, qTL, tmp);                   // quadrants 0 & 2 and 1 & 3 from source
-  vconcat(dst, tmp, dst);
-
-  return false;
-}
-
-Mat ifft(Mat inputMatrix)
-       {bool flag_row = false;
-    bool flag_col = false;
-
-    if( (inputMatrix.rows % 2)>0)
-    {
-        cv::Mat row = cv::Mat::zeros(1,inputMatrix.cols, CV_64F);  
-        inputMatrix.push_back(row);
-        flag_row =true;
-    }
-
-    if( (inputMatrix.cols % 2)>0)
-    {
-        cv::Mat col = cv::Mat::zeros(1,inputMatrix.rows, CV_64F);  
-        cv::Mat tmp;
-        inputMatrix.copyTo(tmp);
-        tmp=tmp.t();
-        tmp.push_back(col);
-        tmp=tmp.t();
-        tmp.copyTo(inputMatrix);
-
-        flag_col = true;
-    }
-
-    int cx = inputMatrix.cols/2.0;
-    int cy = inputMatrix.rows/2.0;
-
-    cv::Mat outputMatrix;
-    inputMatrix.copyTo(outputMatrix);
-
-    // rearrange the quadrants of Fourier image
-    // so that the origin is at the image center
-    cv::Mat tmp;
-    cv::Mat q0(outputMatrix, cv::Rect(0, 0, cx, cy));
-    cv::Mat q1(outputMatrix, cv::Rect(cx, 0, cx, cy));
-    cv::Mat q2(outputMatrix, cv::Rect(0, cy, cx, cy));
-    cv::Mat q3(outputMatrix, cv::Rect(cx, cy, cx, cy));
-
-    q0.copyTo(tmp);
-    q3.copyTo(q0);
-    tmp.copyTo(q3);
-
-    q1.copyTo(tmp);
-    q2.copyTo(q1);
-    tmp.copyTo(q2);
-
-    int row = inputMatrix.rows;
-    int col = inputMatrix.cols;
-    // if(flag_row)
-    // {
-    //     outputMatrix = Tools::removerow(outputMatrix,row/2-1);
-    // }
-    // if(flag_col)
-    // {
-    //     outputMatrix = Tools::removecol(outputMatrix,col/2-1);
-    // }
-
-    return outputMatrix;
+    // merge the quadrants in right order
+    Mat tmp1, tmp2;
+    hconcat(bottom_right, bottom_left, tmp1);
+    hconcat(top_right, top_left, tmp2);
+    vconcat(tmp1, tmp2, mask);
 }
