@@ -9,11 +9,16 @@ using namespace cv;
 void expand_img_to_optimal(Mat &padded, Mat &img);
 void fourier_transform(Mat &img);
 void ifft_shift(Mat &mask);                
+static void onMouse(int event, int x, int y, int, void* imgptr);
+
+bool DRAWING_WHITE;
+bool DRAWING_BLACK;
 
 int main(int argc, char **argv)
 {
+    Mat test = Mat::zeros(Size(1024, 720), CV_8U);
     Mat input_img;
-    input_img = imread("Lena.png" , IMREAD_GRAYSCALE);
+    input_img = imread("../materials/lambo.jpg" , IMREAD_GRAYSCALE);
 
     if (input_img.empty())
     {
@@ -36,25 +41,66 @@ void fourier_transform(Mat &img)
 
     dft(complexI, complexI, DFT_COMPLEX_OUTPUT);
 
-    for (float i=0; i<4000; i+=2) {
-        // Create disk mask matrix
-        Mat mask = Mat::zeros(complexI.size(), img.type());
-        mask.convertTo(mask, CV_8U);
-        circle(mask, Point(mask.cols/2, mask.rows/2), i, 1, -1, 8, 0);
+    // Create disk mask matrix
+    Mat mask = Mat::zeros(complexI.size(), CV_8U);
+    namedWindow("Mask", 0);
+    setMouseCallback("Mask", onMouse, &mask); 
 
+    while (true) {
         // Perform ifft shift
-        ifft_shift(mask);
+        Mat tmp_mask = mask.clone();
+        ifft_shift(tmp_mask);
 
         // Destination matrix for masked spectrum
         Mat dest;
-        complexI.copyTo(dest, mask);
+        complexI.copyTo(dest, tmp_mask);
 
         // Perform inverse DFT
         Mat inverseTransform;
-        idft(dest, inverseTransform, DFT_INVERSE|DFT_REAL_OUTPUT);
+        idft(dest, inverseTransform,  DFT_INVERSE|DFT_REAL_OUTPUT);
         normalize(inverseTransform, inverseTransform, 0, 1, NORM_MINMAX);
         imshow("Reconstructed", inverseTransform);
-        waitKey(0);
+        imshow("Mask", mask);    
+        waitKey(10);
+    }
+}
+
+static void onMouse(int event, int x, int y, int flags, void* imgptr) {
+    Mat & img = (*(Mat*)imgptr);
+    Point pt1 = Point(x, y);
+
+    int radius = 25;
+
+    if (event == EVENT_LBUTTONDOWN) {
+        DRAWING_WHITE = true;
+        circle(img, pt1, radius, Scalar(255, 255, 255), -1, 8, 0);
+    }
+
+    else if (event == EVENT_RBUTTONDOWN) {
+        DRAWING_BLACK = true;
+        circle(img, pt1, radius, Scalar(0, 0, 0), -1, 8, 0);
+    }
+
+    else if (event == EVENT_MOUSEMOVE) {
+        if (DRAWING_WHITE) {
+            circle(img, pt1, radius, Scalar(255, 255, 255), -1, 8, 0);
+        }
+        else if (DRAWING_BLACK) {
+            circle(img, pt1, radius, Scalar(0, 0, 0), -1, 8, 0);
+        }
+    }
+
+    else if (event == EVENT_LBUTTONUP || event == EVENT_RBUTTONUP) {
+        DRAWING_WHITE = false;
+        DRAWING_BLACK = false;
+    }
+
+    if (flags == (EVENT_FLAG_CTRLKEY)) {
+        circle(img, pt1, 10000, Scalar(0, 0, 0), -1, 8, 0);
+    }
+
+    else if (flags == (EVENT_FLAG_SHIFTKEY)) {
+        circle(img, pt1, 10000, Scalar(255, 255, 255), -1, 8, 0);
     }
 }
 
