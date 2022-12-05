@@ -16,9 +16,8 @@ bool DRAWING_BLACK;
 
 int main(int argc, char **argv)
 {
-    Mat test = Mat::zeros(Size(1024, 720), CV_8U);
     Mat input_img;
-    input_img = imread("../materials/lambo.jpg" , IMREAD_GRAYSCALE);
+    input_img = imread("fourier_5.jpg" , IMREAD_GRAYSCALE);
 
     if (input_img.empty())
     {
