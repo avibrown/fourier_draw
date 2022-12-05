@@ -95,12 +95,12 @@ static void onMouse(int event, int x, int y, int flags, void* imgptr) {
         DRAWING_BLACK = false;
     }
 
-    if (flags == (EVENT_FLAG_CTRLKEY)) {
-        circle(img, pt1, 10000, Scalar(0, 0, 0), -1, 8, 0);
+    else if (event == EVENT_LBUTTONDBLCLK) {
+        circle(img, pt1, 10000, Scalar(255, 255, 255), -1, 8, 0);
     }
 
-    else if (flags == (EVENT_FLAG_SHIFTKEY)) {
-        circle(img, pt1, 10000, Scalar(255, 255, 255), -1, 8, 0);
+    else if (event == (EVENT_RBUTTONDBLCLK)) {
+        circle(img, pt1, 10000, Scalar(0, 0, 0), -1, 8, 0);
     }
 }
 
