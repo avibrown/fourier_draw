@@ -68,7 +68,7 @@ static void onMouse(int event, int x, int y, int flags, void* imgptr) {
     Mat & img = (*(Mat*)imgptr);
     Point pt1 = Point(x, y);
 
-    int radius = 25;
+    int radius = 18;
 
     if (event == EVENT_LBUTTONDOWN) {
         DRAWING_WHITE = true;
