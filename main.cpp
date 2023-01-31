@@ -20,7 +20,7 @@ int main(int argc, char **argv)
     std::vector<std::string> files;
     DIR *dir;
     struct dirent *ent;
-    if ((dir = opendir("./")) != NULL) {
+    if ((dir = opendir("./imgs/")) != NULL) {
         while ((ent = readdir(dir)) != NULL) {
             std::string file_name(ent->d_name);
             if (file_name.find(".jpg") != std::string::npos || file_name.find(".png") != std::string::npos)
@@ -34,7 +34,7 @@ int main(int argc, char **argv)
     }
 
     if (files.empty()) {
-        std::cerr << "No .jpg or .png files found in the current directory." << std::endl;
+        std::cerr << "No .jpg or .png files found in the ./img directory." << std::endl;
         return -1;
     }
 
@@ -51,11 +51,11 @@ int main(int argc, char **argv)
     }
 
     Mat input_img;
-    input_img = imread(files[index - 1] , IMREAD_GRAYSCALE);
+    input_img = imread("./imgs/" + files[index - 1], IMREAD_GRAYSCALE);
 
     if (input_img.empty())
     {
-        fprintf(stderr, "Could not Open image\n\n");
+        fprintf(stderr, "Could not open image\n\n");
         return -1;
     }
 
