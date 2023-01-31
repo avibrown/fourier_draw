@@ -3,6 +3,7 @@
 #include <opencv2/imgcodecs.hpp>
 #include <opencv2/imgproc.hpp>
 #include <iostream>
+#include <dirent.h>
 
 using namespace cv;
 
@@ -16,8 +17,41 @@ bool DRAWING_BLACK;
 
 int main(int argc, char **argv)
 {
+    std::vector<std::string> files;
+    DIR *dir;
+    struct dirent *ent;
+    if ((dir = opendir("./")) != NULL) {
+        while ((ent = readdir(dir)) != NULL) {
+            std::string file_name(ent->d_name);
+            if (file_name.find(".jpg") != std::string::npos || file_name.find(".png") != std::string::npos)
+                files.push_back(file_name);
+        }
+        closedir(dir);
+    }
+    else {
+        std::cerr << "Could not open directory." << std::endl;
+        return -1;
+    }
+
+    if (files.empty()) {
+        std::cerr << "No .jpg or .png files found in the current directory." << std::endl;
+        return -1;
+    }
+
+    std::cout << "Please select an image by entering its index:" << std::endl;
+    for (int i = 0; i < files.size(); i++)
+        std::cout << i + 1 << ": " << files[i] << std::endl;
+
+    int index;
+    std::cin >> index;
+
+    if (index < 1 || index > files.size()) {
+        std::cerr << "Invalid index." << std::endl;
+        return -1;
+    }
+
     Mat input_img;
-    input_img = imread("fourier_5.jpg" , IMREAD_GRAYSCALE);
+    input_img = imread(files[index - 1] , IMREAD_GRAYSCALE);
 
     if (input_img.empty())
     {
