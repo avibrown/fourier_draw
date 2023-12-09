@@ -7,6 +7,7 @@ DRAWING_WHITE = False
 DRAWING_BLACK = False
 radius = 18  # Initial radius
 sigma = 10  # Initial sigma value
+distance_threshold = radius / 10
 
 def on_sigma_trackbar(val):
     global sigma
@@ -15,6 +16,12 @@ def on_sigma_trackbar(val):
 def on_trackbar(val):
     global radius
     radius = val
+
+
+def on_distance_trackbar(val):
+    global distance_threshold
+    # Map the trackbar value to a range (1 to 50, for example)
+    distance_threshold = val / 2.0  # Adjust divisor for desired sensitivity
 
 
 def expand_img_to_optimal(img):
@@ -44,37 +51,51 @@ def ifft_shift(mask):
     mask[:] = np.vstack((tmp1, tmp2))
 
 def apply_gaussian_dot(mask, center, radius, value, sigma):
-    # Create a Gaussian kernel
-    gaussian = cv2.getGaussianKernel(radius * 2, sigma)
+    # Ensure sigma is not zero to avoid division by zero error
+    sigma = max(sigma, 1)
+
+    # Determine the size of the Gaussian kernel
+    kernel_size = int(max(radius * 2, sigma * 6))
+    gaussian = cv2.getGaussianKernel(kernel_size, sigma)
     gaussian = gaussian * gaussian.T
     gaussian = gaussian / gaussian.max() * 255  # Normalize to 255
 
-    # Define the bounds for the region to be updated
+    # Calculate the top-left corner of where the Gaussian kernel should be applied
     x, y = center
     h, w = mask.shape
-    x1, x2 = max(x - radius, 0), min(x + radius, w - 1)
-    y1, y2 = max(y - radius, 0), min(y + radius, h - 1)
+    x1 = max(x - kernel_size // 2, 0)
+    y1 = max(y - kernel_size // 2, 0)
 
-    # Calculate Gaussian kernel slice ranges
-    gx1, gx2 = max(radius - x, 0), min(radius + w - x, radius * 2)
-    gy1, gy2 = max(radius - y, 0), min(radius + h - y, radius * 2)
+    # Define the bounds for the region to be updated
+    x2 = min(x1 + kernel_size, w)
+    y2 = min(y1 + kernel_size, h)
+
+    # Calculate Gaussian kernel slice ranges, adjusted for the mask's edges
+    gx1 = max(0, x1 - (x - kernel_size // 2))
+    gy1 = max(0, y1 - (y - kernel_size // 2))
+    gx2 = min(kernel_size, gx1 + min(x2 - x1, kernel_size))
+    gy2 = min(kernel_size, gy1 + min(y2 - y1, kernel_size))
 
     # Blend the Gaussian kernel into the mask
-    mask_slice = mask[y1:y2 + 1, x1:x2 + 1]
-    gaussian_slice = gaussian[gy1:gy2, gx1:gx2]
+    mask_slice = mask[y1:y2, x1:x2]
 
-    # Ensure the slices are the same size
-    dy, dx = gaussian_slice.shape
-    mask_slice = mask_slice[:dy, :dx]
+    # Calculate the center of the Gaussian kernel
+    kernel_center_x = kernel_size // 2
+    kernel_center_y = kernel_size // 2
+
+    # Calculate the region of the Gaussian kernel to use
+    gx1 = max(kernel_center_x - (x - x1), 0)
+    gy1 = max(kernel_center_y - (y - y1), 0)
+    gx2 = min(gx1 + mask_slice.shape[1], kernel_size)
+    gy2 = min(gy1 + mask_slice.shape[0], kernel_size)
+
+    gaussian_slice = gaussian[gy1:gy2, gx1:gx2]
 
     # Apply the Gaussian dot
     if value == 255:  # For white drawing
-        # Add Gaussian values to the mask and clip
-        mask[y1:y1+dy, x1:x1+dx] = np.clip(mask_slice + gaussian_slice, 0, 255)
+        mask[y1:y2, x1:x2] = np.clip(mask_slice + gaussian_slice, 0, 255)
     elif value == 0:  # For black drawing
-        # Subtract Gaussian values from the mask and clip
-        mask[y1:y1+dy, x1:x1+dx] = np.clip(mask_slice - gaussian_slice, 0, 255)
-
+        mask[y1:y2, x1:x2] = np.clip(mask_slice - gaussian_slice, 0, 255)
 
 last_dot_position = None
 
@@ -90,12 +111,12 @@ def onMouse(event, x, y, flags, param):
         return (dx * dx + dy * dy) > threshold * threshold
 
     if event == cv2.EVENT_LBUTTONDOWN or (event == cv2.EVENT_MOUSEMOVE and DRAWING_WHITE):
-        if moved_significantly(x, y, last_dot_position, radius / 4):
+        if moved_significantly(x, y, last_dot_position, distance_threshold):
             apply_gaussian_dot(mask, (x, y), radius, 255, sigma)
             last_dot_position = (x, y)
             DRAWING_WHITE = True
     elif event == cv2.EVENT_RBUTTONDOWN or (event == cv2.EVENT_MOUSEMOVE and DRAWING_BLACK):
-        if moved_significantly(x, y, last_dot_position, radius / 4):
+        if moved_significantly(x, y, last_dot_position, distance_threshold):
             apply_gaussian_dot(mask, (x, y), radius, 0, sigma)
             last_dot_position = (x, y)
             DRAWING_BLACK = True
@@ -139,7 +160,8 @@ def main():
     mask = np.zeros(complexI.shape[:2], dtype=np.uint8)
     cv2.namedWindow("Mask", cv2.WINDOW_GUI_NORMAL)
     cv2.createTrackbar("Size", "Mask", 18, 100, on_trackbar)  # Trackbar to adjust radius
-    cv2.createTrackbar("Sigma", "Mask", sigma, 100, on_sigma_trackbar)  # New trackbar for sigma
+    cv2.createTrackbar("Marks distance scale", "Mask", 10, 100, on_distance_trackbar)
+    cv2.createTrackbar("Sigma", "Mask", sigma, 50, on_sigma_trackbar)  # New trackbar for sigma
     cv2.setMouseCallback("Mask", onMouse, mask)
 
     while True:
