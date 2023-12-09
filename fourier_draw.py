@@ -7,7 +7,6 @@ DRAWING_BLACK = False
 
 radius = 18
 use_gaussian = True  # Toggle for using Gaussian or solid dot
-sigma = 10  # Constant sigma value
 
 def on_trackbar(val):
     global radius
@@ -43,19 +42,20 @@ def ifft_shift(mask):
     tmp2 = np.hstack((top_right, top_left))
     mask[:] = np.vstack((tmp1, tmp2))
 
-
-def apply_dot(mask, center, radius, value, use_gaussian, sigma):
+def apply_dot(mask, center, radius, value, use_gaussian):
     x, y = center
     h, w = mask.shape
 
     if use_gaussian:
-        kernel_size = int(radius * 2)
+        sigma = radius / 2  # Example: sigma as a third of the radius
+        kernel_size = int(6 * sigma + 1)  # Calculate kernel size based on sigma
+
         gaussian = cv2.getGaussianKernel(kernel_size, sigma)
         gaussian = gaussian * gaussian.T
         gaussian = gaussian / gaussian.max() * 255
 
-        x1, y1 = max(x - radius, 0), max(y - radius, 0)
-        x2, y2 = min(x + radius, w), min(y + radius, h)
+        x1, y1 = max(x - kernel_size // 2, 0), max(y - kernel_size // 2, 0)
+        x2, y2 = min(x + kernel_size // 2, w), min(y + kernel_size // 2, h)
 
         mask_slice = mask[y1:y2, x1:x2]
         gaussian_slice = gaussian[:y2 - y1, :x2 - x1]
@@ -72,10 +72,10 @@ def onMouse(event, x, y, flags, param):
     mask = param
 
     if event == cv2.EVENT_LBUTTONDOWN or (event == cv2.EVENT_MOUSEMOVE and DRAWING_WHITE):
-        apply_dot(mask, (x, y), radius, 255, use_gaussian, sigma)
+        apply_dot(mask, (x, y), radius, 255, use_gaussian)
         DRAWING_WHITE = True
     elif event == cv2.EVENT_RBUTTONDOWN or (event == cv2.EVENT_MOUSEMOVE and DRAWING_BLACK):
-        apply_dot(mask, (x, y), radius, 0, use_gaussian, sigma)
+        apply_dot(mask, (x, y), radius, 0, use_gaussian)
         DRAWING_BLACK = True
     elif event in [cv2.EVENT_LBUTTONUP, cv2.EVENT_RBUTTONUP]:
         DRAWING_WHITE = False
@@ -86,7 +86,7 @@ def onMouse(event, x, y, flags, param):
         mask[:, :] = 0
 
 def main():
-    global use_gaussian
+    global use_gaussian, sigma
     path = "./imgs/"
     files = [f for f in os.listdir(path) if f.endswith(('.jpg', '.png'))]
 
@@ -110,6 +110,7 @@ def main():
     if input_img is None:
         print("Could not open image")
         return
+
     complexI = fourier_transform(input_img)
     mask = np.zeros(complexI.shape[:2], dtype=np.uint8)
     cv2.namedWindow("Mask", cv2.WINDOW_GUI_NORMAL)
