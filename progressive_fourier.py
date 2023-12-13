@@ -25,8 +25,11 @@ def fourier_transform_animation(image_path, points_per_iteration=10):
     dft_shift_red = np.fft.fftshift(dft_red)
 
     # Initialize window
-    cv2.namedWindow("Fourier Transform", cv2.WINDOW_NORMAL)
     cv2.namedWindow("Inverse Fourier Transform", cv2.WINDOW_NORMAL)
+
+    # Initialize Video Writer
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    video_writer = cv2.VideoWriter('fourier_transform_animation.avi', fourcc, 20.0, (img.shape[1], img.shape[0]))
 
     # Frequency components
     rows, cols, _ = img.shape
@@ -73,14 +76,19 @@ def fourier_transform_animation(image_path, points_per_iteration=10):
         # Display the result
         cv2.imshow("Inverse Fourier Transform", img_back)
 
+        # Write frame to video
+        video_writer.write(img_back)
+
         # Check for 'q' key to break the loop
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+    # Release Video Writer
+    video_writer.release()
+
     # Wait indefinitely after the animation is complete
     cv2.waitKey(0)
     cv2.destroyAllWindows()
-
 
 def main():
     # Path to the images
@@ -107,7 +115,7 @@ def main():
 
     if 0 <= choice < len(img_files):
         selected_img_path = os.path.join(img_dir, img_files[choice])
-        fourier_transform_animation(selected_img_path, points_per_iteration=100)
+        fourier_transform_animation(selected_img_path, points_per_iteration=10)
     else:
         print("Invalid selection.")
 
